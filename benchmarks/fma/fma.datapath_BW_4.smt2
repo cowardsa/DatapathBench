@@ -1,4 +1,5 @@
 ; solver scope 0
+(set-logic QF_BV)
 (declare-const tmp (_ BitVec 4))
 (declare-const tmp_0 (_ BitVec 4))
 (declare-const tmp_1 (_ BitVec 4))
