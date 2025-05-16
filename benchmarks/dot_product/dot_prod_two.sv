@@ -1,5 +1,5 @@
 module dot_prod_two #(
-    BW = 16
+    BW = 8
 )
 (
     input logic [BW-1:0] a,
