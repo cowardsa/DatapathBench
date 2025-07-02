@@ -3,3 +3,4 @@
 *.v
 *.dot
 *.stat
+*.aig.*
