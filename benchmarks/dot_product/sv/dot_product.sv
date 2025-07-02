@@ -1,4 +1,4 @@
-module dot_prod_two #(
+module dot_product #(
     BW = 8
 )
 (
