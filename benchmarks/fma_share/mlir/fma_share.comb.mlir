@@ -1,13 +1,13 @@
 module {
-  hw.module @fma_share(in %a : i16, in %b : i16, in %c : i16, in %d : i16, out res_c : i32, out res_d : i32) {
-    %c0_i16 = hw.constant 0 : i16
-    %0 = comb.concat %c0_i16, %a : i16, i16
-    %1 = comb.concat %c0_i16, %b : i16, i16
-    %2 = comb.mul %0, %1 : i32
-    %3 = comb.concat %c0_i16, %c : i16, i16
-    %4 = comb.add %2, %3 : i32
-    %5 = comb.concat %c0_i16, %d : i16, i16
-    %6 = comb.add %2, %5 : i32
-    hw.output %4, %6 : i32, i32
+  hw.module @fma_share(in %a : i8, in %b : i8, in %c : i8, in %d : i8, out res_c : i16, out res_d : i16) {
+    %c0_i8 = hw.constant 0 : i8
+    %0 = comb.concat %c0_i8, %a : i8, i8
+    %1 = comb.concat %c0_i8, %b : i8, i8
+    %2 = comb.mul %0, %1 : i16
+    %3 = comb.concat %c0_i8, %c : i8, i8
+    %4 = comb.add %2, %3 : i16
+    %5 = comb.concat %c0_i8, %d : i8, i8
+    %6 = comb.add %2, %5 : i16
+    hw.output %4, %6 : i16, i16
   }
 }

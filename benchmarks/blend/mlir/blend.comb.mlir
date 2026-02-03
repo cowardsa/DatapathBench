@@ -1,18 +1,18 @@
 module {
-  hw.module @blend(in %A : i16, in %B : i16, in %C : i16, out D : i32) {
-    %c0_i15 = hw.constant 0 : i15
-    %c0_i16 = hw.constant 0 : i16
+  hw.module @blend(in %A : i8, in %B : i8, in %C : i8, out D : i16) {
+    %c0_i7 = hw.constant 0 : i7
+    %c0_i8 = hw.constant 0 : i8
     %false = hw.constant false
-    %c-65536_i17 = hw.constant -65536 : i17
-    %0 = comb.concat %false, %A : i1, i16
-    %1 = comb.sub %c-65536_i17, %0 {sv.namehint = "one_minus_A"} : i17
-    %2 = comb.concat %c0_i16, %A : i16, i16
-    %3 = comb.concat %c0_i16, %B : i16, i16
-    %4 = comb.mul %2, %3 : i32
-    %5 = comb.concat %c0_i15, %1 : i15, i17
-    %6 = comb.concat %c0_i16, %C : i16, i16
-    %7 = comb.mul %5, %6 : i32
-    %8 = comb.add %4, %7 : i32
-    hw.output %8 : i32
+    %c-256_i9 = hw.constant -256 : i9
+    %0 = comb.concat %false, %A : i1, i8
+    %1 = comb.sub %c-256_i9, %0 {sv.namehint = "one_minus_A"} : i9
+    %2 = comb.concat %c0_i8, %A : i8, i8
+    %3 = comb.concat %c0_i8, %B : i8, i8
+    %4 = comb.mul %2, %3 : i16
+    %5 = comb.concat %c0_i7, %1 : i7, i9
+    %6 = comb.concat %c0_i8, %C : i8, i8
+    %7 = comb.mul %5, %6 : i16
+    %8 = comb.add %4, %7 : i16
+    hw.output %8 : i16
   }
 }

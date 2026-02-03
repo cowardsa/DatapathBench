@@ -1,11 +1,11 @@
 module {
-  hw.module @signedfma(in %a : i16, in %b : i16, in %c : i16, out res : i32) {
-    %c0_i16 = hw.constant 0 : i16
-    %0 = comb.concat %c0_i16, %a : i16, i16
-    %1 = comb.concat %c0_i16, %b : i16, i16
-    %2 = comb.mul %0, %1 : i32
-    %3 = comb.concat %c0_i16, %c : i16, i16
-    %4 = comb.sub %2, %3 : i32
-    hw.output %4 : i32
+  hw.module @FmaSgn(in %a : i8, in %b : i8, in %c : i8, out res : i16) {
+    %c0_i8 = hw.constant 0 : i8
+    %0 = comb.concat %c0_i8, %a : i8, i8
+    %1 = comb.concat %c0_i8, %b : i8, i8
+    %2 = comb.mul %0, %1 : i16
+    %3 = comb.concat %c0_i8, %c : i8, i8
+    %4 = comb.sub %2, %3 : i16
+    hw.output %4 : i16
   }
 }

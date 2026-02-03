@@ -4,3 +4,4 @@ module {
     hw.output %0 : i8
   }
 }
+

@@ -8,9 +8,12 @@ module {
     %2 = comb.add %0, %1 {sv.namehint = "t1"} : i9
     %3 = comb.concat %c0_i8, %c : i8, i8
     %4 = comb.concat %c0_i8, %d : i8, i8
-    %5 = comb.mul %3, %4 {sv.namehint = "t2"} : i16
-    %6 = comb.concat %c0_i7, %2 : i7, i9
-    %7 = comb.icmp ugt %6, %5 : i16
-    hw.output %7 : i1
+    %5:8 = datapath.partial_product %3, %4 : (i16, i16) -> (i16, i16, i16, i16, i16, i16, i16, i16)
+    %6:2 = datapath.compress %5#0, %5#1, %5#2, %5#3, %5#4, %5#5, %5#6, %5#7 : i16 [8 -> 2]
+    %7 = comb.add bin %6#0, %6#1 : i16
+    %8 = comb.concat %c0_i7, %2 : i7, i9
+    %9 = comb.icmp ugt %8, %7 : i16
+    hw.output %9 : i1
   }
 }
+
