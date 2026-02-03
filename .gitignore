@@ -4,3 +4,6 @@
 *.dot
 *.stat
 *.aig.*
+**/output/
+*.csv
+*.smt2
