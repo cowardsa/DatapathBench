@@ -1,13 +1,13 @@
 module {
-  hw.module @dot_product(in %a : i4, in %b : i4, in %c : i4, in %d : i4, out res : i8) {
-    %c0_i4 = hw.constant 0 : i4
-    %0 = comb.concat %c0_i4, %a : i4, i4
-    %1 = comb.concat %c0_i4, %b : i4, i4
-    %2 = comb.mul %0, %1 : i8
-    %3 = comb.concat %c0_i4, %c : i4, i4
-    %4 = comb.concat %c0_i4, %d : i4, i4
-    %5 = comb.mul %3, %4 : i8
-    %6 = comb.add %2, %5 : i8
-    hw.output %6 : i8
+  hw.module @dot_product(in %a : i16, in %b : i16, in %c : i16, in %d : i16, out res : i32) {
+    %c0_i16 = hw.constant 0 : i16
+    %0 = comb.concat %c0_i16, %a : i16, i16
+    %1 = comb.concat %c0_i16, %b : i16, i16
+    %2 = comb.mul %0, %1 : i32
+    %3 = comb.concat %c0_i16, %c : i16, i16
+    %4 = comb.concat %c0_i16, %d : i16, i16
+    %5 = comb.mul %3, %4 : i32
+    %6 = comb.add %2, %5 : i32
+    hw.output %6 : i32
   }
 }

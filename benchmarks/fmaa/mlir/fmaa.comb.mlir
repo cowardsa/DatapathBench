@@ -1,10 +1,10 @@
 module {
-  hw.module @fmaa(in %a : i20, in %b : i20, in %c : i61, in %d : i61, out res : i61) {
-    %c0_i41 = hw.constant 0 : i41
-    %0 = comb.concat %c0_i41, %a : i41, i20
-    %1 = comb.concat %c0_i41, %b : i41, i20
-    %2 = comb.mul %0, %1 : i61
-    %3 = comb.add %2, %c, %d : i61
-    hw.output %3 : i61
+  hw.module @fmaa(in %a : i16, in %b : i16, in %c : i49, in %d : i49, out res : i49) {
+    %c0_i33 = hw.constant 0 : i33
+    %0 = comb.concat %c0_i33, %a : i33, i16
+    %1 = comb.concat %c0_i33, %b : i33, i16
+    %2 = comb.mul %0, %1 : i49
+    %3 = comb.add %2, %c, %d : i49
+    hw.output %3 : i49
   }
 }

@@ -1,5 +1,5 @@
 module fma #(
-    BW = 16
+    BW = 8
 )
 (
     input logic [BW-1:0] a,
@@ -8,6 +8,6 @@ module fma #(
     output logic [2*BW-1:0] res
 );
 
-assign res = a*b + c;
+assign res = a*b + c;   
 
 endmodule
