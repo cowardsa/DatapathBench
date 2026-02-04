@@ -11,7 +11,7 @@ Note that the .mlir representations do not support parameterisation
 therefore each file is a specific instatiation of the module.
 
 ## Evaluation
-We provide a script for reporting the different flows shown in the picture below. Technology mapping will be added in the future.
+We provide a script for reporting the different flows shown in the picture below.
 Every evaluation must specify a bitwidth, and you can optionally specify a single benchmark to run. 
 ```
 python3 eval_bench.py <bitwidth> [benchmark]
