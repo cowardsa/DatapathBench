@@ -48,7 +48,7 @@ class SynthDataSet:
         self.output_dir = output_dir
         self.bw = bw
         self.stats = {}
-        self.sv_file = f"{self.dir}/sv/{self.dir}.sv"
+        self.sv_file = f"benchmarks/{self.dir}/sv/{self.dir}.sv"
         self.comb_mlir_file = f"{self.output_dir}/{self.dir}..comb.mlir"
         self.mlir_aig_file = f"{self.output_dir}/{self.dir}.{self.name}.aig.mlir"
         self.aiger_file = f"{self.output_dir}/{self.dir}.{self.name}.aig"
@@ -56,7 +56,7 @@ class SynthDataSet:
     # Convert sv to comb mlir and run circt-synth
     def run_circt_synth(self, options=""):
         # Generate comb MLIR from SV
-        run(f'circt-verilog {self.dir}/sv/{self.dir}.sv -G BW={self.bw} -o {self.comb_mlir_file}')
+        run(f'circt-verilog {self.sv_file} -G BW={self.bw} -o {self.comb_mlir_file}')
 
         # Run once with timing to get longest path
         run(f'circt-synth {self.comb_mlir_file} {options} -o {self.mlir_aig_file} --output-longest-path={self.output_dir}/{self.dir}.{self.name}.path')
@@ -98,14 +98,23 @@ class SynthDataSet:
             print(f"Error: Unsupported input format '{input_fmt}' for yosys synthesis.")
             assert False
 
-        
         stat_file = f"{self.output_dir}/{self.dir}.{self.name}.yosys_stat"
         start = time.time()
         # Run Yosys synthesis and generate an AIGER file if processing sv
         run(f'yosys -f verilog -p "{yosys_cmd}" > {stat_file}')
         self.stats['yosys_time'] = time.time() - start
         self.stats['yosys_cells'] = grep_stat(stat_file, r'Number of cells: +([0-9]+)')
-        
+    
+    def run_abc_techmapping(self, area, delay):
+        # Run ABC technology mapping on the AIGER file
+        start = time.time()
+        run(f'abc -c "read_genlib libraries/asap7.genlib; read {self.aiger_file}; strash; map; print_stats" > {self.output_dir}/{self.dir}.{self.name}.abc_stat')
+        self.stats['abc_techmap_time'] = time.time() - start
+
+        self.stats['abc_area'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'area =+([0-9.]+)')
+        self.stats['abc_delay'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'delay =+([0-9.]+)')
+        area[self.name].append(float(self.stats['abc_area']))
+        delay[self.name].append(float(self.stats['abc_delay']))
 
     def print_header(self):
         header = ""
@@ -136,7 +145,7 @@ class SynthDataSet:
 def main():
 
     # Preprocessing checks
-    requirements = ["circt-synth", "circt-opt", "circt-translate", "yosys"]
+    requirements = ["circt-synth", "circt-opt", "circt-translate", "yosys", "abc"]
     for req in requirements:
         if not can_run_command(req):
             print(f"Error: Required command '{req}' is not available. Please install it and ensure it's in your PATH.")
@@ -156,12 +165,14 @@ def main():
     if len(sys.argv) >= 3:
         dirs = [sys.argv[2]]
     else:
-        dirs = [d for d in glob.glob("*/") if os.path.isdir(d)]
+        dirs = [d for d in glob.glob("benchmarks/*/") if os.path.isdir(d)]
     
     print_header = True
     names = []
     cells_list = {'comb': [], 'datapath': [], 'yosys': []}
     circt_levels_list = {'comb': [], 'datapath': []}
+    area = {'comb': [], 'datapath': [], 'yosys': []}
+    delay = {'comb': [], 'datapath': [], 'yosys': []}
 
     # Create output directory
     output_dir = f"output"
@@ -171,15 +182,14 @@ def main():
     # Iterate through all benchmark directories        
     for dir in dirs:
         dir = dir.rstrip('/')
+        dir = dir.replace("benchmarks/", "")
 
-        if dir == "output":
-            continue
-        
         names.append(dir)
 
         # Baseline Yosys - pass bitwidth parameter
         yosys = SynthDataSet("yosys", dir, output_dir, bw)
         yosys.run_yosys_synth("sv")
+        yosys.run_abc_techmapping(area, delay)
         # Add stats for plotting
         cells_list['yosys'].append(int(yosys.stats['yosys_cells']))
         
@@ -187,6 +197,7 @@ def main():
         comb = SynthDataSet("comb", dir, output_dir, bw)
         comb.run_circt_synth("--disable-datapath")
         comb.run_yosys_synth("aiger")
+        comb.run_abc_techmapping(area, delay)
         # Add stats for plotting
         cells_list['comb'].append(int(comb.stats['yosys_cells']))
         circt_levels_list['comb'].append(int(comb.stats['circt_levels']))
@@ -195,6 +206,7 @@ def main():
         datapath = SynthDataSet("datapath", dir, output_dir, bw)
         datapath.run_circt_synth()
         datapath.run_yosys_synth("aiger")
+        datapath.run_abc_techmapping(area, delay)
         # Add stats for plotting
         cells_list['datapath'].append(int(datapath.stats['yosys_cells']))
         circt_levels_list['datapath'].append(int(datapath.stats['circt_levels']))
@@ -222,16 +234,16 @@ def main():
             writer = csv.writer(f)
             writer.writerow([
                 "Name",
-                "Yosys Cells",
-                "Comb Cells", "Comb Levels (CIRCT)",
-                "Datapath Cells", "Datapath Levels (CIRCT)"
+                "Yosys Area", "Yosys Delay",
+                "Comb Area", "Comb Delay", "Comb Levels (CIRCT)",
+                "Datapath Area", "Datapath Delay", "Datapath Levels (CIRCT)"
             ])
             for i in range(len(names)):
                 writer.writerow([
                     names[i],
-                    cells_list['yosys'][i], 
-                    cells_list['comb'][i], circt_levels_list['comb'][i],
-                    cells_list['datapath'][i], circt_levels_list['datapath'][i]
+                    area['yosys'][i], delay['yosys'][i],
+                    area['comb'][i], delay['comb'][i], circt_levels_list['comb'][i],
+                    area['datapath'][i], delay['datapath'][i], circt_levels_list['datapath'][i]
                 ])
         print(f"\nResults written to {csv_file}")
 
@@ -272,22 +284,23 @@ def main():
     # axs[0, 1].legend()
 
     # Cells comparison comb vs datapath vs yosys
-    axs[1, 0].set_title('Cells (measeured by Yosys)')
-    axs[1, 0].bar(x - width/2, cells_list['comb'], width/2, color='tab:red', label='Comb')
-    axs[1, 0].bar(x, cells_list['datapath'], width/2, color='tab:green', label='Datapath')
-    axs[1, 0].bar(x + width/2, cells_list['yosys'], width/2, color='tab:purple', label='Yosys')
+    axs[1, 0].set_title('Area (measured by abc)')
+    axs[1, 0].bar(x - width/2, area['comb'], width/2, color='tab:red', label='Comb')
+    axs[1, 0].bar(x, area['datapath'], width/2, color='tab:green', label='Datapath')
+    axs[1, 0].bar(x + width/2, area['yosys'], width/2, color='tab:purple', label='Yosys')
     axs[1, 0].set_xticks(x)
     axs[1, 0].set_xticklabels(names, rotation=45, ha='right')
-    axs[1, 0].set_ylabel('Cells')
+    axs[1, 0].set_ylabel('Area (um^2)')
     axs[1, 0].legend()
 
     # Longest Path comparison comb vs datapath
-    axs[1, 1].set_title('Longest Path Comparison (measured by CIRCT)')
-    axs[1, 1].bar(x - width/2, circt_levels_list['comb'], width/2, color='tab:red', label='Comb')
-    axs[1, 1].bar(x, circt_levels_list['datapath'], width/2, color='tab:green', label='Datapath')
+    axs[1, 1].set_title('Delay (measured by abc)')
+    axs[1, 1].bar(x - width/2, delay['comb'], width/2, color='tab:red', label='Comb')
+    axs[1, 1].bar(x, delay['datapath'], width/2, color='tab:green', label='Datapath')
+    axs[1, 1].bar(x + width/2, delay['yosys'], width/2, color='tab:purple', label='Yosys')
     axs[1, 1].set_xticks(x)
     axs[1, 1].set_xticklabels(names, rotation=45, ha='right')
-    axs[1, 1].set_ylabel('Levels')
+    axs[1, 1].set_ylabel('Delay (ns)')
     
     axs[1, 1].legend()
 
