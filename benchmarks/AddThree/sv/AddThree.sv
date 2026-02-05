@@ -1,4 +1,10 @@
-module add_three 
+// Copyright 2025 University College London.
+// MIT License License, see LICENSE for details.
+//
+// Authors:
+// - Samuel Coward <sam.coward@ucl.ac.uk>
+
+module AddThree 
 #(
     // Parameterized width for the inputs and output
     parameter BW = 8

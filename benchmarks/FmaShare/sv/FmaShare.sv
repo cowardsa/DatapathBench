@@ -1,7 +1,14 @@
+// Copyright 2025 University College London.
+// MIT License License, see LICENSE for details.
+//
+// Authors:
+// - Samuel Coward <sam.coward@ucl.ac.uk>
+//
 // Based on Reto Zimmerman Paper:
-// Optimized Synthesis of Sum-of-Products
-module fma_share #(
-    BW = 16
+// Optimized Synthesis of Sum-of-Products (Figure 1)
+
+module FmaShare #(
+    BW = 8
 )
 (
     input logic [BW-1:0] a,

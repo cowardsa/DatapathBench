@@ -1,3 +1,9 @@
+// Copyright 2025 University College London.
+// MIT License License, see LICENSE for details.
+//
+// Authors:
+// - Samuel Coward <sam.coward@ucl.ac.uk>
+
 module MulThree #(
     parameter BW = 8
 )  // Parameterized width for the multiplier

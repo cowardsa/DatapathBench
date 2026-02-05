@@ -1,4 +1,10 @@
-module fma #(
+// Copyright 2025 University College London.
+// MIT License License, see LICENSE for details.
+//
+// Authors:
+// - Samuel Coward <sam.coward@ucl.ac.uk>
+
+module Fma #(
     BW = 8
 )
 (
