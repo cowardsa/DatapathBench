@@ -14,6 +14,6 @@ module FmaSgn #(
     output logic  signed [2*BW-1:0] res
 );
 
-assign res = a*b - c;   
+assign res = a*b + c;   
 
 endmodule
