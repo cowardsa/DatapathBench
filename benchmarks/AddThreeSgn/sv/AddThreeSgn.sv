@@ -4,7 +4,7 @@
 // Authors:
 // - Samuel Coward <sam.coward@ucl.ac.uk>
 
-module AddThree 
+module AddThreeSgn 
 #(
     // Parameterized width for the inputs and output
     parameter BW = 8
