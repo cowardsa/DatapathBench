@@ -6,4 +6,4 @@
 *.aig.*
 **/output/
 *.csv
-*.smt2
+__pycache__
