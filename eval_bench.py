@@ -16,7 +16,7 @@ from datapath import DatapathDataSet
 # Usage: python3 eval_bench.py <bitwidth> [directory]
 def main():
     # Preprocessing checks
-    requirements = ["circt-synth", "circt-opt", "circt-translate", "yosys", "abc"]
+    requirements = ["circt-synth", "circt-opt", "circt-translate", "yosys", "yosys-abc"]
     for req in requirements:
         if not can_run_command(req):
             print(f"Error: Required command '{req}' is not available. Please install it and ensure it's in your PATH.")
@@ -34,13 +34,15 @@ def main():
         sys.exit(1)
 
     if len(sys.argv) >= 3:
-        dirs = [sys.argv[2]]
+        dirs = sys.argv[2:]
     else:
         dirs = [d for d in glob.glob("benchmarks/*/") if os.path.isdir(d)]
     
+    dirs = sorted(dirs)  # Sort directories for consistent output
+    
     print_header = True
     names = []
-    cells_list = {'comb': [], 'datapath': [], 'yosys': []}
+    time_list = {'comb': [], 'datapath': [], 'yosys': []}
     circt_levels_list = {'comb': [], 'datapath': []}
     area = {'comb': [], 'datapath': [], 'yosys': []}
     delay = {'comb': [], 'datapath': [], 'yosys': []}
@@ -61,28 +63,28 @@ def main():
         yosys = DatapathDataSet("yosys", dir, output_dir, bw)
         yosys.run_yosys_synth("sv")
         yosys.run_abc_techmapping(area, delay)
-        yosys.run_emap_techmapping()
+        # yosys.run_emap_techmapping()
         # Add stats for plotting
-        cells_list['yosys'].append(int(yosys.stats['yosys_cells']))
+        time_list['yosys'].append(float(yosys.stats['yosys_time']))
         
         # Baseline circt-synth - disable datapath optimizations
         comb = DatapathDataSet("comb", dir, output_dir, bw)
         comb.run_circt_synth("--disable-datapath")
-        comb.run_yosys_synth("aiger")
+        # comb.run_yosys_synth("aiger")
         comb.run_abc_techmapping(area, delay)
         # comb.run_emap_techmapping()
         # Add stats for plotting
-        cells_list['comb'].append(int(comb.stats['yosys_cells']))
+        time_list['comb'].append(float(comb.stats['circt_time']))
         circt_levels_list['comb'].append(int(comb.stats['circt_levels']))
 
         # Full circt-synth - enable datapath optimizations
         datapath = DatapathDataSet("datapath", dir, output_dir, bw)
         datapath.run_circt_synth()
-        datapath.run_yosys_synth("aiger")
+        # datapath.run_yosys_synth("aiger")
         datapath.run_abc_techmapping(area, delay)
         # datapath.run_emap_techmapping()
         # Add stats for plotting
-        cells_list['datapath'].append(int(datapath.stats['yosys_cells']))
+        time_list['datapath'].append(float(datapath.stats['circt_time']))
         circt_levels_list['datapath'].append(int(datapath.stats['circt_levels']))
 
         if print_header:
@@ -126,7 +128,7 @@ def main():
     # Plotting
     ############################################################################
     # Normalized ratios
-    yosys_comparison_cell_ratios = [d/y if y else 0 for d, y in zip(cells_list['datapath'], cells_list['yosys'])]
+    yosys_comparison_time_ratios = [d/y if y else 0 for d, y in zip(time_list['datapath'], time_list['yosys'])]
     circt_level_ratios = [d/y if y else 0 for d, y in zip(circt_levels_list['datapath'], circt_levels_list['comb'])]
     comb_datapath_level_ratios = [d/y if y else 0 for d, y in zip(circt_levels_list['datapath'], circt_levels_list['comb'])]
     
@@ -137,15 +139,15 @@ def main():
     fig, axs = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(f"{bw}-bit", fontsize=18)
     
-    # Datapath vs Yosys Cells Ration - Measured using Yosys
-    axs[0, 0].set_title('Datapath/Yosys Cells Ratio (measured by Yosys)')
-    bar1 = axs[0, 0].bar(x - width/4, yosys_comparison_cell_ratios, width/2, color='tab:blue', label='Cells')
+    # # Datapath vs Yosys Cells Ration - Measured using Yosys
+    axs[0, 0].set_title('Datapath/Yosys Runtime Ratio')
+    bar1 = axs[0, 0].bar(x - width/4, yosys_comparison_time_ratios, width/2, color='tab:blue', label='Cells')
     axs[0, 0].axhline(y=1, color='red', linestyle='--')
     axs[0, 0].set_xticks(x)
     axs[0, 0].set_xticklabels(names, rotation=45, ha='right')
     axs[0, 0].set_ylabel('Ratio')
-    axs[0, 0].set_ylim(0, max(yosys_comparison_cell_ratios + [1.2]))
-    # axs[0, 0].legend()
+    axs[0, 0].set_ylim(0, max(yosys_comparison_time_ratios + [1.2]))
+    axs[0, 0].legend()
 
     # Datapath vs Comb Levels Ratios - Measured using CIRCT
     axs[0, 1].set_title('Datapath/Comb Longest Path Ratio (measured by CIRCT)')

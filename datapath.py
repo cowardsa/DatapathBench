@@ -32,8 +32,8 @@ class DatapathDataSet:
         run(f'circt-verilog {self.sv_file} -G BW={self.bw} -o {self.comb_mlir_file}')
 
         # Run once with timing to get longest path
-        run(f'circt-synth {self.comb_mlir_file} {options} -o {self.mlir_aig_file} --output-longest-path={self.output_dir}/{self.dir}.{self.name}.path')
-        self.stats['circt_levels'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.path", r'Maximum path delay: ([0-9]+)')
+        run(f'circt-synth {self.comb_mlir_file} {options} -o {self.mlir_aig_file} --analysis-output={self.output_dir}/{self.dir}.{self.name}')
+        self.stats['circt_levels'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}/longest_path.txt", r'Maximum path delay: ([0-9]+)')
         
         # Run again to get clean timing info - without longest path analysis
         # Comb --> AIG in MLIR
@@ -76,7 +76,6 @@ class DatapathDataSet:
         # Run Yosys synthesis and generate an AIGER file if processing sv
         run(f'yosys -f verilog -p "{yosys_cmd}" > {stat_file}')
         self.stats['yosys_time'] = time.time() - start
-        self.stats['yosys_cells'] = grep_stat(stat_file, r'Number of cells: +([0-9]+)')
     
     ############################################################################
     # Technology Mapping
@@ -84,11 +83,14 @@ class DatapathDataSet:
     def run_abc_techmapping(self, area, delay):
         # Run ABC technology mapping on the AIGER file
         start = time.time()
-        run(f'abc -c "read_genlib libraries/asap7.genlib; read {self.aiger_file}; strash; map; print_stats" > {self.output_dir}/{self.dir}.{self.name}.abc_stat')
+        run(f'yosys-abc -c "read_genlib libraries/asap7.genlib; read {self.aiger_file}; strash; map; print_stats" > {self.output_dir}/{self.dir}.{self.name}.abc_stat')
         self.stats['abc_time'] = time.time() - start
 
-        self.stats['abc_area'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'area =+([0-9.]+)')
-        self.stats['abc_delay'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'delay =+([0-9.]+)')
+        self.stats['abc_area'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'area\s*=\s*+([0-9.]+)')
+        self.stats['abc_delay'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'delay\s*=\s*+([0-9.]+)')
+        if self.stats['abc_area'] == "" or self.stats['abc_delay'] == "":
+            print(f"Error: Failed to extract area or delay from ABC stats for {self.name} in {self.dir}.")
+            assert False
         area[self.name].append(float(self.stats['abc_area']))
         delay[self.name].append(float(self.stats['abc_delay']))
 
