@@ -1,6 +1,7 @@
 import time
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 # Defined locally
 from utils import run, grep_stat
@@ -112,7 +113,9 @@ class DatapathDataSet:
         run(f'circt-synth {self.comb_mlir_file} {options} --convert-to-comb -o {self.mlir_aig_file}')
         
         run(f'circt-lec {self.comb_mlir_file} {self.mlir_aig_file} --c1 {self.dir} --c2 {self.dir} --emit-smtlib -o {self.smt2_file}')
-        run(f'sed -i \'/(reset)/d\' {self.smt2_file}')
+        smt2_path = Path(self.smt2_file)
+        lines = smt2_path.read_text().splitlines(keepends=True)
+        smt2_path.write_text("".join(line for line in lines if "(reset)" not in line))
     
     def run_z3(self, options=""):
         start = time.time()
