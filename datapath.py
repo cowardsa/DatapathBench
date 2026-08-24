@@ -1,5 +1,4 @@
 import time
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -57,7 +56,7 @@ class DatapathDataSet:
     # Run yosys synthesis on either sv or aiger input from circt-synth flow
     def run_yosys_synth(self, input_fmt):
         
-        yosys_cmd = f' synth;'
+        yosys_cmd = f' synth -noabc;'
         # Process System Verilog
         if input_fmt == "sv":
             yosys_cmd = f'read_verilog -sv {self.sv_file}; chparam -set BW {self.bw} {self.dir};' + yosys_cmd
@@ -110,8 +109,11 @@ class DatapathDataSet:
     def generate_smtlib(self, options=""):
         # Generate comb MLIR from SV
         run(f'circt-verilog {self.sv_file} -G BW={self.bw} -o {self.comb_mlir_file}')
-        run(f'circt-synth {self.comb_mlir_file} {options} --convert-to-comb -o {self.mlir_aig_file}')
-        
+
+        run(
+            f'circt-synth {self.comb_mlir_file} {options} '
+            f'--convert-to-comb -o {self.mlir_aig_file}'
+        )
         run(f'circt-lec {self.comb_mlir_file} {self.mlir_aig_file} --c1 {self.dir} --c2 {self.dir} --emit-smtlib -o {self.smt2_file}')
         smt2_path = Path(self.smt2_file)
         lines = smt2_path.read_text().splitlines(keepends=True)
@@ -119,21 +121,17 @@ class DatapathDataSet:
     
     def run_z3(self, options=""):
         start = time.time()
-        run(f'z3 -T:60 {self.smt2_file}', f'{self.output_dir}/equiv.log')
+        run(f'z3 {options} -T:60 {self.smt2_file}', f'{self.output_dir}/equiv.log')
         self.stats["z3_time"] = time.time() - start
         with open(f'{self.output_dir}/equiv.log', 'r') as f:
-            log = f.read()
-            match = re.search(r'sat', log)
-            if match:
-                self.stats["equiv"] = "NEQ"
-            
-            match = re.search(r'unknown', log)
-            if match: 
-                self.stats["equiv"] = "UNKNOWN"
-            
-            match = re.search(r'unsat', log)
-            if match:
-                self.stats["equiv"] = "EQ"
+            result = f.read().strip()
+
+        if result == "unsat":
+            self.stats["equiv"] = "EQ"
+        elif result == "sat":
+            self.stats["equiv"] = "NEQ"
+        else:
+            self.stats["equiv"] = "UNKNOWN"
     
     def print_header(self):
         header = ""
