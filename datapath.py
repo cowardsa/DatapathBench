@@ -1,6 +1,6 @@
 import time
-import re
 from dataclasses import dataclass
+from pathlib import Path
 
 # Defined locally
 from utils import run, grep_stat
@@ -10,11 +10,12 @@ from utils import run, grep_stat
 ################################################################################
 # @dataclass
 class DatapathDataSet:
-    def __init__(self, name, dir, output_dir, bw=None):
+    def __init__(self, name, dir, output_dir, bw=None, abc_command="abc"):
         self.name = name
         self.dir = dir
         self.output_dir = output_dir
         self.bw = bw
+        self.abc_command = abc_command
         self.stats = {}
         self.sv_file = f"benchmarks/{self.dir}/sv/{self.dir}.sv"
         self.comb_mlir_file = f"{self.output_dir}/{self.dir}.comb.mlir"
@@ -32,8 +33,8 @@ class DatapathDataSet:
         run(f'circt-verilog {self.sv_file} -G BW={self.bw} -o {self.comb_mlir_file}')
 
         # Run once with timing to get longest path
-        run(f'circt-synth {self.comb_mlir_file} {options} -o {self.mlir_aig_file} --output-longest-path={self.output_dir}/{self.dir}.{self.name}.path')
-        self.stats['circt_levels'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.path", r'Maximum path delay: ([0-9]+)')
+        run(f'circt-synth {self.comb_mlir_file} {options} -o {self.mlir_aig_file} --analysis-output={self.output_dir}/{self.dir}.{self.name}')
+        self.stats['circt_levels'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}/longest_path.txt", r'Maximum path delay: ([0-9]+)')
         
         # Run again to get clean timing info - without longest path analysis
         # Comb --> AIG in MLIR
@@ -56,7 +57,7 @@ class DatapathDataSet:
     # Run yosys synthesis on either sv or aiger input from circt-synth flow
     def run_yosys_synth(self, input_fmt):
         
-        yosys_cmd = f' synth;'
+        yosys_cmd = f' synth -noabc;'
         # Process System Verilog
         if input_fmt == "sv":
             yosys_cmd = f'read_verilog -sv {self.sv_file}; chparam -set BW {self.bw} {self.dir};' + yosys_cmd
@@ -76,7 +77,6 @@ class DatapathDataSet:
         # Run Yosys synthesis and generate an AIGER file if processing sv
         run(f'yosys -f verilog -p "{yosys_cmd}" > {stat_file}')
         self.stats['yosys_time'] = time.time() - start
-        self.stats['yosys_cells'] = grep_stat(stat_file, r'Number of cells: +([0-9]+)')
     
     ############################################################################
     # Technology Mapping
@@ -84,11 +84,14 @@ class DatapathDataSet:
     def run_abc_techmapping(self, area, delay):
         # Run ABC technology mapping on the AIGER file
         start = time.time()
-        run(f'abc -c "read_genlib libraries/asap7.genlib; read {self.aiger_file}; strash; map; print_stats" > {self.output_dir}/{self.dir}.{self.name}.abc_stat')
+        run(f'{self.abc_command} -c "read_genlib libraries/asap7.genlib; read {self.aiger_file}; strash; map; print_stats" > {self.output_dir}/{self.dir}.{self.name}.abc_stat')
         self.stats['abc_time'] = time.time() - start
 
-        self.stats['abc_area'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'area =+([0-9.]+)')
-        self.stats['abc_delay'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'delay =+([0-9.]+)')
+        self.stats['abc_area'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'area\s*=\s*+([0-9.]+)')
+        self.stats['abc_delay'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'delay\s*=\s*+([0-9.]+)')
+        if self.stats['abc_area'] == "" or self.stats['abc_delay'] == "":
+            print(f"Error: Failed to extract area or delay from ABC stats for {self.name} in {self.dir}.")
+            assert False
         area[self.name].append(float(self.stats['abc_area']))
         delay[self.name].append(float(self.stats['abc_delay']))
 
@@ -107,28 +110,29 @@ class DatapathDataSet:
     def generate_smtlib(self, options=""):
         # Generate comb MLIR from SV
         run(f'circt-verilog {self.sv_file} -G BW={self.bw} -o {self.comb_mlir_file}')
-        run(f'circt-synth {self.comb_mlir_file} {options} --convert-to-comb -o {self.mlir_aig_file}')
-        
+
+        run(
+            f'circt-synth {self.comb_mlir_file} {options} '
+            f'--convert-to-comb -o {self.mlir_aig_file}'
+        )
         run(f'circt-lec {self.comb_mlir_file} {self.mlir_aig_file} --c1 {self.dir} --c2 {self.dir} --emit-smtlib -o {self.smt2_file}')
-        run(f'sed -i \'/(reset)/d\' {self.smt2_file}')
+        smt2_path = Path(self.smt2_file)
+        lines = smt2_path.read_text().splitlines(keepends=True)
+        smt2_path.write_text("".join(line for line in lines if "(reset)" not in line))
     
     def run_z3(self, options=""):
         start = time.time()
-        run(f'z3 -T:60 {self.smt2_file}', f'{self.output_dir}/equiv.log')
+        run(f'z3 {options} -T:60 {self.smt2_file}', f'{self.output_dir}/equiv.log')
         self.stats["z3_time"] = time.time() - start
         with open(f'{self.output_dir}/equiv.log', 'r') as f:
-            log = f.read()
-            match = re.search(r'sat', log)
-            if match:
-                self.stats["equiv"] = "NEQ"
-            
-            match = re.search(r'unknown', log)
-            if match: 
-                self.stats["equiv"] = "UNKNOWN"
-            
-            match = re.search(r'unsat', log)
-            if match:
-                self.stats["equiv"] = "EQ"
+            result = f.read().strip()
+
+        if result == "unsat":
+            self.stats["equiv"] = "EQ"
+        elif result == "sat":
+            self.stats["equiv"] = "NEQ"
+        else:
+            self.stats["equiv"] = "UNKNOWN"
     
     def print_header(self):
         header = ""
