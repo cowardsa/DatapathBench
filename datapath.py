@@ -10,11 +10,12 @@ from utils import run, grep_stat
 ################################################################################
 # @dataclass
 class DatapathDataSet:
-    def __init__(self, name, dir, output_dir, bw=None):
+    def __init__(self, name, dir, output_dir, bw=None, abc_command="abc"):
         self.name = name
         self.dir = dir
         self.output_dir = output_dir
         self.bw = bw
+        self.abc_command = abc_command
         self.stats = {}
         self.sv_file = f"benchmarks/{self.dir}/sv/{self.dir}.sv"
         self.comb_mlir_file = f"{self.output_dir}/{self.dir}.comb.mlir"
@@ -83,7 +84,7 @@ class DatapathDataSet:
     def run_abc_techmapping(self, area, delay):
         # Run ABC technology mapping on the AIGER file
         start = time.time()
-        run(f'yosys-abc -c "read_genlib libraries/asap7.genlib; read {self.aiger_file}; strash; map; print_stats" > {self.output_dir}/{self.dir}.{self.name}.abc_stat')
+        run(f'{self.abc_command} -c "read_genlib libraries/asap7.genlib; read {self.aiger_file}; strash; map; print_stats" > {self.output_dir}/{self.dir}.{self.name}.abc_stat')
         self.stats['abc_time'] = time.time() - start
 
         self.stats['abc_area'] = grep_stat(f"{self.output_dir}/{self.dir}.{self.name}.abc_stat", r'area\s*=\s*+([0-9.]+)')

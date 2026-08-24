@@ -16,11 +16,16 @@ from datapath import DatapathDataSet
 # Usage: python3 eval_bench.py <bitwidth> [directory]
 def main():
     # Preprocessing checks
-    requirements = ["circt-synth", "circt-opt", "circt-translate", "yosys", "yosys-abc"]
+    requirements = ["circt-synth", "circt-opt", "circt-translate", "yosys"]
     for req in requirements:
         if not can_run_command(req):
             print(f"Error: Required command '{req}' is not available. Please install it and ensure it's in your PATH.")
             sys.exit(1)
+
+    abc_command = next((command for command in ("abc", "yosys-abc") if can_run_command(command)), None)
+    if abc_command is None:
+        print("Error: Required command 'abc' or 'yosys-abc' is not available. Please install one and ensure it's in your PATH.")
+        sys.exit(1)
 
     if len(sys.argv) < 2:
         print("Error: No bitwidth specified")
@@ -60,7 +65,7 @@ def main():
         names.append(dir)
 
         # Baseline Yosys - pass bitwidth parameter
-        yosys = DatapathDataSet("yosys", dir, output_dir, bw)
+        yosys = DatapathDataSet("yosys", dir, output_dir, bw, abc_command)
         yosys.run_yosys_synth("sv")
         yosys.run_abc_techmapping(area, delay)
         # yosys.run_emap_techmapping()
@@ -68,7 +73,7 @@ def main():
         time_list['yosys'].append(float(yosys.stats['yosys_time']))
         
         # Baseline circt-synth - disable datapath optimizations
-        comb = DatapathDataSet("comb", dir, output_dir, bw)
+        comb = DatapathDataSet("comb", dir, output_dir, bw, abc_command)
         comb.run_circt_synth("--disable-datapath")
         # comb.run_yosys_synth("aiger")
         comb.run_abc_techmapping(area, delay)
@@ -78,7 +83,7 @@ def main():
         circt_levels_list['comb'].append(int(comb.stats['circt_levels']))
 
         # Full circt-synth - enable datapath optimizations
-        datapath = DatapathDataSet("datapath", dir, output_dir, bw)
+        datapath = DatapathDataSet("datapath", dir, output_dir, bw, abc_command)
         datapath.run_circt_synth()
         # datapath.run_yosys_synth("aiger")
         datapath.run_abc_techmapping(area, delay)
